@@ -1,12 +1,16 @@
-.env
-.idea
 pgdata
 zen-packages
 node_modules
 zen.jar
 synthea-with-dependencies.jar
-.nrepl-port
+aidbox-javascript-sdk-v1.0.0.tgz
 target
+zen-project
+
+.env
+
+.idea
+.nrepl-port
 .DS_Store
 load-data.ts
 clear-data.ts
@@ -14,4 +18,3 @@ clear-data.ts
 .clj-kondo/
 .cpcache/
 .lsp/
-zen-project

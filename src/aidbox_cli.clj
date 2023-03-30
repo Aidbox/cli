@@ -2,7 +2,8 @@
   (:gen-class)
   (:require [zen.cli]
             [zen.core]
-            [generator.cli]))
+            [generator.cli]
+            [ftr.zen-cli]))
 
 (defn -main [& args]
   (let [ztx (zen.core/new-context)

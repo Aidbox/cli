@@ -6,7 +6,9 @@
  :deps {zen-lang/zen         {:git/url "https://github.com/zen-lang/zen"
                               :sha     "22de0131a4364aa3d6a00ea3e7c7376629ee9b98"}
         aidbox/aidbox-sdk-js {:git/url "https://github.com/Aidbox/aidbox-sdk-js"
-                              :sha     "cbf0b979a6871e7c4112c707345d00b93bed5807"}}
+                              :sha     "d12ba951732914134608d93346600f5d44edf0fe"}
+        HealthSamurai/ftr    {:git/url "https://github.com/HealthSamurai/ftr"
+                              :sha     "89a09d7dbc017edbb71adfdc3cba9caa53c04de8"}}
 
  :aliases
  {:nrepl
