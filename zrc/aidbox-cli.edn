@@ -1,0 +1,7 @@
+{ns aidbox-cli
+ import #{zen.cli sdk-cli}
+
+ config
+ {:zen/tags #{zen.cli/config}
+  :commands {:zen    {:config zen.cli/zen-config}
+             :ts-sdk {:config sdk-cli/config}}}}
