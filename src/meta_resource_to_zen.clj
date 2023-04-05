@@ -1,15 +1,13 @@
-(ns zen.aidbox-fhir-mapping
+(ns meta-resource-to-zen
   (:require [clojure.java.io :as io]
             [cheshire.core :as ch]
-            [zen.fhir]
+            [clojure.string]
             [zen.core]
-            [zen]
             [clojure.edn :as edn]))
-
 
 (def fhir-primitive->zen-primitive
   '{"boolean" {:type zen/boolean}
-
+    "CodeableConcept" {:confirms #{hl7-fhir-r4-core.CodeableConcept/schema}}
     "decimal"     {:type zen/number}
     "integer"     {:type zen/integer}
     "number"     {:type zen/number}
@@ -17,7 +15,6 @@
                    :min  0}
     "positiveInt" {:type zen/integer
                    :min  1}
-
     "string"       {:type      zen/string
                     :maxLength 1048576}
     "markdown"     {:type      zen/string
@@ -45,7 +42,6 @@
     "time"     {:type  zen/string
                 :regex "^([01][0-9]|2[0-3]):[0-5][0-9]:([0-5][0-9]|60)(\\.[0-9]+)?$"}})
 
-
 (def context (atom {}))
 
 (defn generate-namespace [name]
@@ -58,9 +54,7 @@
               'import (merge import 'zen/fhir 'zenbox)
               'schema schema}}))
 
-
-(def avoid-keys #{:isRequired :search})
-
+(def avoid-keys #{:isRequired :search :isCollection :extensionUrl})
 
 (defn read-versions [ztx path]
   (println "Reading zen packages...")
@@ -73,14 +67,13 @@
   [ztx references]
   (let [version (namespace (first (zen.core/get-tag ztx 'zen.fhir/base-schemas)))
         schema (:schemas (zen.core/get-symbol ztx (symbol (str version "/base-schemas"))))]
-    ;; (println (first schema))
     (set (mapv (fn [item]
                  (let [schema-key (first (vals (second (first (filter (fn [i] (= (first i) item)) schema)))))
                        reference (if schema-key schema-key (symbol (str (generate-namespace item) "/schema")))]
                    (swap! context update-in
                           [(:current @context) :reference]
                           #(conj %
-                            (symbol reference)))
+                                 (symbol reference)))
                    reference))
                references))))
 
@@ -88,35 +81,37 @@
   (filter (fn [key]
             (:isRequired (key (:attrs data)))) (keys (:attrs data))))
 
+(defn set-data-recursively [parse-data ztx data]
+  (let [require (get-require data)]
+    (reduce (fn [acc key]
+              (-> acc (merge (if (> (count require) 0) {:require (set require)} {}))
+                  (merge (cond (= key :attrs) {:keys (parse-data ztx (key data) key)}
+                               (= key :type) (parse-data ztx (key data) key)
+                               (= key :description) {:zen/desc (:description data)}
+                               :else {key (parse-data ztx (key data) key)}))))
+            {} (filter #(not (contains? avoid-keys %)) (keys data)))))
 
 (defn parse-data [ztx data key]
-  (let [require (get-require data)]
-    (cond
-      (:isCollection data)
-      {:type 'zen/vector :every (reduce (fn [acc key]
-                                          (-> acc (assoc :require (set require))
-                                              (assoc (if (= key :attrs) :keys key)
-                                                     (parse-data ztx (key data) key)))) {} (filter #(not (contains? avoid-keys %)) (keys  data)))}
-      (:isOpen data)
-      {:validation-type :open}
-      (= (:type data) "Reference")
-      {:confirms #{'zen.fhir/Reference}
-       :zen.fhir/reference {:refers (getReferences ztx (:refers data))}}
-      (= key :enum)
-      (mapv (fn [item] {:value item}) data)
-      (and (= key :type) (:type (fhir-primitive->zen-primitive data)))
-      (:type (fhir-primitive->zen-primitive data))
-      (map? data)
-      (reduce (fn [acc key]
-                (-> acc (assoc :require (set require))
-                    (assoc (if (= key :attrs) :keys key)
-                           (parse-data ztx (key data) key)))) {} (filter #(not (contains? avoid-keys %)) (keys data)))
+  (cond
+    (:isCollection data)
+    {:type 'zen/vector :every (set-data-recursively parse-data ztx data)}
+    (:isOpen data)
+    {:validation-type :open}
+    (= (:type data) "Reference")
+    {:confirms #{'zen.fhir/Reference}
+     :zen.fhir/reference {:refers (getReferences ztx (:refers data))}}
+    (= key :enum)
+    (mapv (fn [item] {:value item}) data)
+    (and (= key :type) (fhir-primitive->zen-primitive data))
+    (fhir-primitive->zen-primitive data)
+    (map? data)
+    (set-data-recursively parse-data ztx data)
 
-      :else nil)))
+    :else nil))
 
 (defn map-data []
-  (let [ztx  (zen.core/new-context {:package-paths ["/Users/pavel/Desktop/zen/zen-project"]})
-        _ (read-versions ztx "/Users/pavel/Desktop/zen/zen-project")
+  (let [ztx  (zen.core/new-context {:package-paths ["/Users/ross/Desktop/HS/cli/zen-project"]})
+        _ (read-versions ztx "/Users/ross/Desktop/HS/cli/zen-project")
         manifest (ch/parse-stream (io/reader (-> (java.io.File. "data.json") .getAbsolutePath)) true)
         entities (:entities manifest)
         default-values {:zen/tags   #{'zen/schema 'zen.fhir/base-schema 'zenbox/persistent}
@@ -128,14 +123,13 @@
                             (assoc acc key (merge default-values (parse-data ztx (key entities) key))))
                           {} (keys entities))]
 
-
-
     (mapv (fn [[key value]]
             (let [wrapper (get-wrapper (name key) value)]
 
               (io/make-parents (str "custom/" (name key) ".edn"))
               (spit (str "custom/" (name key) ".edn") (second (first wrapper)))
 
-
               wrapper)) resources)))
+
+(map-data)
 

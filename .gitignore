@@ -18,3 +18,5 @@ clear-data.ts
 .clj-kondo/
 .cpcache/
 .lsp/
+
+custom
