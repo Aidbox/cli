@@ -1,9 +1,10 @@
-(ns meta-resource-to-zen
+(ns zen-migration.meta-resource-to-zen
   (:require [clojure.java.io :as io]
-            [cheshire.core :as ch]
+            [clojure.set]
             [clojure.string]
             [zen.core]
-            [clojure.edn :as edn]))
+            [clojure.edn :as edn]
+            [clj-http.client :as http]))
 
 (def fhir-primitive->zen-primitive
   '{"boolean" {:type zen/boolean}
@@ -51,7 +52,7 @@
   (let [ns-name (generate-namespace name)
         import (set (map #(symbol (clojure.string/replace %1 #"/schema" "")) (:reference ((keyword name) @context))))]
     {ns-name {'ns ns-name,
-              'import (merge import 'zen/fhir 'zenbox)
+              'import (clojure.set/union import #{'zen/fhir 'zenbox})
               'schema schema}}))
 
 (def avoid-keys #{:isRequired :search :isCollection :extensionUrl})
@@ -109,27 +110,41 @@
 
     :else nil))
 
-(defn map-data []
-  (let [ztx  (zen.core/new-context {:package-paths ["/Users/ross/Desktop/HS/cli/zen-project"]})
-        _ (read-versions ztx "/Users/ross/Desktop/HS/cli/zen-project")
-        manifest (ch/parse-stream (io/reader (-> (java.io.File. "data.json") .getAbsolutePath)) true)
-        entities (:entities manifest)
+(defn get-adibox-creds [path]
+  (reduce (fn [acc item]
+            (let [[key value] (clojure.string/split item #"=")]
+              (assoc acc (keyword key) value)))
+          {} (line-seq (io/reader path))))
+
+(defn get-aidbox-apps [{aidbox-url :AIDBOX_URL
+                        aidbox-client :AIDBOX_CLIENT
+                        aidbox-secret :AIDBOX_SECRET}]
+  (println aidbox-url aidbox-client aidbox-secret)
+  (http/get (str aidbox-url "App") {:basic-auth [aidbox-client aidbox-secret] :as :json}))
+
+(defn map-data [path-to-creds path-to-zen]
+  (let [ztx  (zen.core/new-context {:package-paths [path-to-zen]})
+        _ (read-versions ztx path-to-zen)
+        creads (get-adibox-creds path-to-creds)
+        apps (:entry (:body (get-aidbox-apps creads)))
         default-values {:zen/tags   #{'zen/schema 'zen.fhir/base-schema 'zenbox/persistent}
                         :confirms   #{'zen.fhir/Resource}
-                        :type       'zen/map}
-        resources (reduce (fn [acc key]
-                            (swap! context assoc key {:reference [], :require {}})
-                            (swap! context assoc :current key)
-                            (assoc acc key (merge default-values (parse-data ztx (key entities) key))))
-                          {} (keys entities))]
+                        :type       'zen/map}]
+    (->> apps
+         (map :resource)
+         (mapv (fn [{:keys [entities]}]
+                 (->> (reduce (fn [acc key]
+                                (swap! context assoc key {:reference [], :require {}})
+                                (swap! context assoc :current key)
+                                (assoc acc key (merge default-values (parse-data ztx (key entities) key))))
+                              {} (keys entities))
+                      (map (fn [[key value]]
+                             (let [wrapper (get-wrapper (name key) value)]
+                               (io/make-parents (str "custom/" (name key) ".edn"))
+                               (spit (str "custom/" (name key) ".edn") (second (first wrapper)))
 
-    (mapv (fn [[key value]]
-            (let [wrapper (get-wrapper (name key) value)]
+                               wrapper)))))))))
 
-              (io/make-parents (str "custom/" (name key) ".edn"))
-              (spit (str "custom/" (name key) ".edn") (second (first wrapper)))
-
-              wrapper)) resources)))
-
-(map-data)
+(comment
+  (map-data "/Users/ross/Desktop/HS/cli/creds.txt" "/Users/ross/Desktop/HS/cli/zen-project"))
 

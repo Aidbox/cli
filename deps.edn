@@ -9,7 +9,8 @@
         aidbox/aidbox-sdk-js {:git/url "https://github.com/Aidbox/aidbox-sdk-js"
                               :sha     "d12ba951732914134608d93346600f5d44edf0fe"}
         HealthSamurai/ftr    {:git/url "https://github.com/HealthSamurai/ftr"
-                              :sha     "89a09d7dbc017edbb71adfdc3cba9caa53c04de8"}}
+                              :sha     "89a09d7dbc017edbb71adfdc3cba9caa53c04de8"}
+        clj-http/clj-http     {:mvn/version "3.12.3"}}
 
  :aliases
  {:nrepl
