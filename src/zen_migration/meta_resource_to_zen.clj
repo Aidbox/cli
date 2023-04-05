@@ -119,10 +119,9 @@
 (defn get-aidbox-apps [{aidbox-url :AIDBOX_URL
                         aidbox-client :AIDBOX_CLIENT
                         aidbox-secret :AIDBOX_SECRET}]
-  (println aidbox-url aidbox-client aidbox-secret)
   (http/get (str aidbox-url "App") {:basic-auth [aidbox-client aidbox-secret] :as :json}))
 
-(defn map-data [path-to-creds path-to-zen]
+(defn migrate-to-zen [path-to-zen path-to-creds]
   (let [ztx  (zen.core/new-context {:package-paths [path-to-zen]})
         _ (read-versions ztx path-to-zen)
         creads (get-adibox-creds path-to-creds)
@@ -131,20 +130,21 @@
                         :confirms   #{'zen.fhir/Resource}
                         :type       'zen/map}]
     (->> apps
-         (map :resource)
+         (mapv :resource)
          (mapv (fn [{:keys [entities]}]
                  (->> (reduce (fn [acc key]
                                 (swap! context assoc key {:reference [], :require {}})
                                 (swap! context assoc :current key)
                                 (assoc acc key (merge default-values (parse-data ztx (key entities) key))))
                               {} (keys entities))
-                      (map (fn [[key value]]
-                             (let [wrapper (get-wrapper (name key) value)]
-                               (io/make-parents (str "custom/" (name key) ".edn"))
-                               (spit (str "custom/" (name key) ".edn") (second (first wrapper)))
+                      (mapv (fn [[key value]]
+                              (let [wrapper (get-wrapper (name key) value)]
+                                (io/make-parents (str "custom/" (name key) ".edn"))
+                                (spit (str "custom/" (name key) ".edn") (second (first wrapper)))
 
-                               wrapper)))))))))
+                                wrapper)))))))
+    :ok))
 
 (comment
-  (map-data "/Users/ross/Desktop/HS/cli/creds.txt" "/Users/ross/Desktop/HS/cli/zen-project"))
+  (migrate-to-zen "/Users/ross/Desktop/HS/cli/creds.txt" "/Users/ross/Desktop/HS/cli/zen-project"))
 

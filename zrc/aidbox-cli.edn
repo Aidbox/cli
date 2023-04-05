@@ -1,8 +1,19 @@
 {ns aidbox-cli
  import #{zen.cli sdk-cli extended-zen-cli}
 
+ migrate-to-zen
+ {:zen/tags   #{zen.cli/command}
+  :zen/desc   "Migrate meta resources to zen"
+  :args-style :positional
+  :args {:type zen/vector
+         :minItems 0
+         :maxItems 1
+         :nth {0 {:type zen/string
+                  :zen/desc "Path to creds"}}}}
+
  config
  {:zen/tags #{zen.cli/config}
-  :commands {:zen    {:config zen.cli/zen-config}
-             :ts-sdk {:config sdk-cli/config}
-             :ftr    {:config extended-zen-cli/config}}}}
+  :commands {:migrate-to-zen {:command migrate-to-zen}
+             :zen            {:config zen.cli/zen-config}
+             :ts-sdk         {:config sdk-cli/config}
+             :ftr            {:config extended-zen-cli/config}}}}
