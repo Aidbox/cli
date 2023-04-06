@@ -50,7 +50,7 @@
   (let [ns-name (generate-namespace name)
         import (set (map #(symbol (clojure.string/replace %1 #"/schema" "")) (:reference ((keyword name) @context))))]
     {ns-name {'ns ns-name,
-              'import (clojure.set/union import #{'zen/fhir 'zenbox})
+              'import (clojure.set/union import #{'zen/fhir 'zenbox 'aidbox.repository.v1})
               'schema schema}}))
 
 (def avoid-keys #{:isRequired :search :isCollection :extensionUrl})
@@ -124,7 +124,7 @@
         _ (read-versions ztx path-to-zen)
         creads (get-adibox-creds path-to-creds)
         apps (:entry (:body (get-aidbox-apps creads)))
-        default-values {:zen/tags   #{'zen/schema 'zen.fhir/base-schema 'zenbox/persistent}
+        default-values {:zen/tags   #{'zen/schema 'zen.fhir/base-schema 'aidbox.repository.v1/repository}
                         :confirms   #{'zen.fhir/Resource}
                         :extra-parameter-sources :all
                         :zen.fhir/version "4.1.1"
