@@ -43,6 +43,8 @@
 
 (def context (atom {}))
 
+(declare get-type)
+
 (defn generate-namespace [name]
   (symbol (str "custom." name)))
 
@@ -53,7 +55,7 @@
               'import (clojure.set/union import #{'zen.fhir 'zenbox 'aidbox.repository.v1})
               'schema schema}}))
 
-(def avoid-keys #{:isRequired :search :isCollection :extensionUrl})
+(def avoid-keys #{:isRequired :search :isCollection :extensionUrl :refers})
 
 (defn read-versions [ztx path]
   (println "Reading zen packages...")
@@ -85,10 +87,11 @@
     (reduce (fn [acc key]
               (-> acc (merge (if (> (count require) 0) {:require (set require)} {}))
                   (merge (cond (= key :attrs) {:keys (parse-data ztx (key data) key) :type 'zen/map}
-                               (and (= key :type) (= data "Reference"))
-                               {:confirms #{'zen.fhir/Reference}
-                                :zen.fhir/reference {:refers (getReferences ztx (:refers data))}}
-                               (and (= key :type) (not= data "Reference")) (parse-data ztx (key data) key)
+                               (= key :type) (if (= (key data) "Reference")
+                                               {:confirms #{'zen.fhir/Reference}
+                                                :zen.fhir/reference {:refers (getReferences ztx (:refers data))}}
+                                               (get-type ztx (key data)))
+
                                (= key :description) {:zen/desc (:description data)}
                                (= key :isOpen) {:validation-type :open}
                                :else {key (parse-data ztx (key data) key)}))))
@@ -98,18 +101,19 @@
   (cond
     (:isCollection data)
     {:type 'zen/vector :every (set-data-recursively parse-data ztx data)}
-    ;; (= (:type data) "Reference")
-    ;; {:confirms #{'zen.fhir/Reference}
-    ;;  :zen.fhir/reference {:refers (getReferences ztx (:refers data))}}
     (= key :enum)
     (mapv (fn [item] {:value item}) data)
-    (= key :type) (cond (fhir-primitive->zen-primitive data)
-                        (fhir-primitive->zen-primitive data)
-                        (map? data) {:type (set-data-recursively parse-data ztx data)}
-                        :else nil)
     (map? data)
     (set-data-recursively parse-data ztx data)
 
+    :else nil))
+
+(defn get-type [ztx data]
+  (cond
+    (fhir-primitive->zen-primitive data)
+    (fhir-primitive->zen-primitive data)
+    (map? data)
+    {:type (set-data-recursively parse-data ztx data)}
     :else nil))
 
 (defn get-adibox-creds [path]
@@ -133,8 +137,8 @@
                         :extra-parameter-sources :all
                         :zen.fhir/version "0.5.11"}]
 
-    (io/make-parents "zen-packages/custom/custom.edn")
-    (spit "zen-packages/custom/custom.edn",  "{:ns custom\n:import #{")
+    (io/make-parents "zrc/custom.edn")
+    (spit "zrc/custom.edn",  "{:ns custom\n:import #{")
 
     (->> apps
          (mapv :resource)
@@ -146,13 +150,12 @@
                               {} (keys entities))
                       (mapv (fn [[key value]]
                               (let [wrapper (get-wrapper (name key) value)]
-                                (io/make-parents (str "zen-packages/custom/" (name key) ".edn"))
-                                (spit "zen-packages/custom/custom.edn",  (str "custom." (name key) "\n") :append true)
-                                (spit (str "zen-packages/custom/" (name key) ".edn") (second (first wrapper)))
-
+                                (io/make-parents (str "zrc/custom/" (name key) ".edn"))
+                                (spit "zrc/custom.edn",  (str "custom." (name key) "\n") :append true)
+                                (spit (str "zrc/custom/" (name key) ".edn") (second (first wrapper)))
                                 wrapper)))))))
 
-    (spit "zen-packages/custom/custom.edn",  "}}" :append true)
+    (spit "zrc/custom.edn",  "}}" :append true)
     :ok))
 
 (comment
