@@ -16,10 +16,8 @@
                    :min  0}
     "positiveInt" {:type zen/integer
                    :min  1}
-    "string"       {:type      zen/string
-                    :maxLength 1048576}
-    "markdown"     {:type      zen/string
-                    :maxLength 1048576}
+    "string"       {:type      zen/string}
+    "markdown"     {:type      zen/string}
     "id"           {:type  zen/string
                     :regex "^[A-Za-z0-9\\-\\.]{1,64}$"}
     "uuid"         {:type  zen/string}
@@ -128,21 +126,30 @@
         apps (:entry (:body (get-aidbox-apps creads)))
         default-values {:zen/tags   #{'zen/schema 'zen.fhir/base-schema 'zenbox/persistent}
                         :confirms   #{'zen.fhir/Resource}
+                        :extra-parameter-sources :all
+                        :zen.fhir/version "4.1.1"
                         :type       'zen/map}]
+
+    (io/make-parents "zen-packages/custom/custom.edn")
+    (spit "zen-packages/custom/custom.edn",  "{:ns custom\n:import #{" :append true)
+
     (->> apps
          (mapv :resource)
          (mapv (fn [{:keys [entities]}]
                  (->> (reduce (fn [acc key]
-                                (swap! context assoc key {:reference [], :require {}})
+                                (swap! context assoc key {:reference [], :namespaces [], :require {}})
                                 (swap! context assoc :current key)
-                                (assoc acc key (merge default-values (parse-data ztx (key entities) key))))
+                                (assoc acc key (merge default-values {:zen.fhir/type (name key)} (parse-data ztx (key entities) key))))
                               {} (keys entities))
                       (mapv (fn [[key value]]
                               (let [wrapper (get-wrapper (name key) value)]
-                                (io/make-parents (str "custom/" (name key) ".edn"))
-                                (spit (str "custom/" (name key) ".edn") (second (first wrapper)))
+                                (io/make-parents (str "zen-packages/custom/" (name key) ".edn"))
+                                (spit "zen-packages/custom/custom.edn",  (str "custom." (name key) "\n"):append true)
+                                (spit (str "zen-packages/custom/" (name key) ".edn") (second (first wrapper)))
 
                                 wrapper)))))))
+
+    (spit "zen-packages/custom/custom.edn",  "}}" :append true)
     :ok))
 
 (comment
