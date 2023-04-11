@@ -137,25 +137,30 @@
                         :extra-parameter-sources :all
                         :zen.fhir/version "0.5.11"}]
 
-    (io/make-parents "zrc/custom.edn")
-    (spit "zrc/custom.edn",  "{:ns custom\n:import #{")
+    (io/make-parents "")
+
+    (println "Generation folder structure")
+    (io/make-parents "zen-packages/custom/zrc/custom/empty")
+    (spit "zen-packages/custom/zrc/custom.edn" "")
+
+
+    (spit "zen-packages/custom/zrc/custom.edn",  "{ns custom\n import #{zen.fhir}\n base-schemas {:zen/tags #{zen.fhir/base-schemas}\n :schemas {")
+
 
     (->> apps
          (mapv :resource)
          (mapv (fn [{:keys [entities]}]
                  (->> (reduce (fn [acc key]
+                                (spit "zen-packages/custom/zrc/custom.edn" (str(str "\""(name key) "\"") " { \"" (name key) "\" #zen/quote " (generate-namespace (name key)) "/schema }\n") :append true)
                                 (swap! context assoc key {:reference [], :namespaces [], :require {}})
                                 (swap! context assoc :current key)
                                 (assoc acc key (merge default-values {:zen.fhir/type (name key)} (parse-data ztx (key entities) key))))
                               {} (keys entities))
                       (mapv (fn [[key value]]
                               (let [wrapper (get-wrapper (name key) value)]
-                                (io/make-parents (str "zrc/custom/" (name key) ".edn"))
-                                (spit "zrc/custom.edn",  (str "custom." (name key) "\n") :append true)
-                                (spit (str "zrc/custom/" (name key) ".edn") (second (first wrapper)))
+                                (spit (str "zen-packages/custom/zrc/custom/" (name key) ".edn") (second (first wrapper)))
                                 wrapper)))))))
-
-    (spit "zrc/custom.edn",  "}}" :append true)
+    (spit "zen-packages/custom/zrc/custom.edn",  "}}\nig {:zen/tags #{zen.fhir/ig},:base-schemas base-schemas}}" :append true)
     :ok))
 
 (comment
