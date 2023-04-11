@@ -114,7 +114,7 @@
     (fhir-primitive->zen-primitive data)
     (map? data)
     {:type (set-data-recursively parse-data ztx data)}
-    :else nil))
+    :else {:validation-type :open}))
 
 (defn get-adibox-creds [path]
   (reduce (fn [acc item]
@@ -143,15 +143,13 @@
     (io/make-parents "zen-packages/custom/zrc/custom/empty")
     (spit "zen-packages/custom/zrc/custom.edn" "")
 
-
     (spit "zen-packages/custom/zrc/custom.edn",  "{ns custom\n import #{zen.fhir}\n base-schemas {:zen/tags #{zen.fhir/base-schemas}\n :schemas {")
-
 
     (->> apps
          (mapv :resource)
          (mapv (fn [{:keys [entities]}]
                  (->> (reduce (fn [acc key]
-                                (spit "zen-packages/custom/zrc/custom.edn" (str(str "\""(name key) "\"") " { \"" (name key) "\" #zen/quote " (generate-namespace (name key)) "/schema }\n") :append true)
+                                (spit "zen-packages/custom/zrc/custom.edn" (str (str "\"" (name key) "\"") " { \"" (name key) "\" #zen/quote " (generate-namespace (name key)) "/schema }\n") :append true)
                                 (swap! context assoc key {:reference [], :namespaces [], :require {}})
                                 (swap! context assoc :current key)
                                 (assoc acc key (merge default-values {:zen.fhir/type (name key)} (parse-data ztx (key entities) key))))
