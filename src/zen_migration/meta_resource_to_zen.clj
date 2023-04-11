@@ -83,19 +83,23 @@
             (:isRequired (key (:attrs data)))) (keys (:attrs data))))
 
 (defn set-data-recursively [parse-data ztx data]
-  (let [require (get-require data)]
-    (reduce (fn [acc key]
-              (-> acc (merge (if (> (count require) 0) {:require (set require)} {}))
-                  (merge (cond (= key :attrs) {:keys (parse-data ztx (key data) key) :type 'zen/map}
-                               (= key :type) (if (= (key data) "Reference")
-                                               {:confirms #{'zen.fhir/Reference}
-                                                :zen.fhir/reference {:refers (getReferences ztx (:refers data))}}
-                                               (get-type ztx (key data)))
+  (let [require (get-require data)
+        filtred-data (filter #(not (contains? avoid-keys %)) (keys data))
+        has-key (not= (count (keys filtred-data)) 0)]
 
-                               (= key :description) {:zen/desc (:description data)}
-                               (= key :isOpen) {:validation-type :open}
-                               :else {key (parse-data ztx (key data) key)}))))
-            {} (filter #(not (contains? avoid-keys %)) (keys data)))))
+    (if has-key
+      (reduce (fn [acc key]
+                (-> acc (merge (if (> (count require) 0) {:require (set require)} {}))
+                    (merge (cond (= key :attrs) {:keys (parse-data ztx (key data) key) :type 'zen/map}
+                                 (= key :type) (if (= (key data) "Reference")
+                                                 {:confirms #{'zen.fhir/Reference}
+                                                  :zen.fhir/reference {:refers (getReferences ztx (:refers data))}}
+                                                 (get-type ztx (key data)))
+
+                                 (= key :description) {:zen/desc (:description data)}
+                                 (= key :isOpen) {:validation-type :open}
+                                 :else {key (parse-data ztx (key data) key)}))))
+              {} filtred-data) {:validation-type :open})))
 
 (defn parse-data [ztx data key]
   (cond
